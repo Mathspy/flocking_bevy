@@ -1,0 +1,10 @@
+[package]
+name = "flocking-bevy"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+bevy = { git = "https://github.com/bevyengine/bevy", rev = "f4cfcc0e44b91446beb49a1dbe9965cb7bcde059" }
+rand = "0.8"
