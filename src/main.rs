@@ -35,8 +35,8 @@ fn main() {
         .add_plugins(DefaultPlugins)
         .add_startup_system(start)
         .add_system(chase_mouse)
-        .add_system(speed_up)
-        .add_system(move_ahead)
+        .add_system(apply_force)
+        .add_system(update_boids)
         .run();
 }
 
@@ -130,7 +130,7 @@ fn start(
         .spawn_bundle(OrthographicCameraBundle::new_2d());
 }
 
-fn move_ahead(mut query: Query<(&mut Transform, &Velocity)>) {
+fn update_boids(mut query: Query<(&mut Transform, &Velocity)>) {
     for (mut transform, velocity) in query.iter_mut() {
         let transform = transform.as_mut();
         // new position = current position + velocity
@@ -171,7 +171,7 @@ fn chase_mouse(windows: Res<Windows>, mut query: Query<(&mut Force, &Velocity, &
     }
 }
 
-fn speed_up(mut query: Query<(&mut Velocity, &mut Force)>) {
+fn apply_force(mut query: Query<(&mut Velocity, &mut Force)>) {
     for (mut velocity, mut force) in query.iter_mut() {
         let force = force.as_mut();
         let velocity = velocity.as_mut();
