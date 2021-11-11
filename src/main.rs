@@ -3,6 +3,7 @@ use bevy::{
     asset::Assets,
     ecs::{
         component::Component,
+        entity::Entity,
         system::{Commands, Query, Res, ResMut},
     },
     math::{Quat, Vec2},
@@ -30,11 +31,41 @@ struct Force {
     max: f32,
 }
 
+/// A boid with Seek is a boid that implements the Seek behavior and will attempt to Seek
+/// a target determined by the property target
+#[derive(Component)]
+struct Seek {
+    /// The target to seek
+    target: Entity,
+    /// A number between 0 and 1 to determine how interested the seeker is in the target
+    /// if the number is 1 then it will apply its full force to seeking the target
+    /// if the number is 0 then it will apply nothing of its force to seeking the target
+    ///
+    /// Important note: if an entity has more than one behavior they will all dampen each other
+    /// so if an entity has Seek some target with 1 interest and Avoid another target with 0.5
+    /// interest then they act proportional to each other (2/3 force from seek and 1/3 from avoid)
+    interest: f32,
+}
+
+/// A special case of Seek where the target is the cursor
+#[derive(Component)]
+struct SeekCursor {
+    /// A number between 0 and 1 to determine how interested the seeker is in the target
+    /// if the number is 1 then it will apply its full force to seeking the target
+    /// if the number is 0 then it will apply nothing of its force to seeking the target
+    ///
+    /// Important note: if an entity has more than one behavior they will all dampen each other
+    /// so if an entity has Seek some target with 1 interest and Avoid another target with 0.5
+    /// interest then they act proportional to each other (2/3 force from seek and 1/3 from avoid)
+    interest: f32,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
         .add_startup_system(start)
-        .add_system(chase_mouse)
+        .add_system(seek_target)
+        .add_system(seek_mouse)
         .add_system(apply_force)
         .add_system(update_boids)
         .run();
@@ -121,7 +152,8 @@ fn start(
                 .insert(Force {
                     vector: Vec2::new(0.0, 0.0),
                     max: 0.25,
-                });
+                })
+                .insert(SeekCursor { interest: 1.0 });
         });
     }
 
@@ -154,18 +186,58 @@ fn update_boids(mut query: Query<(&mut Transform, &Velocity)>) {
     }
 }
 
-fn chase_mouse(windows: Res<Windows>, mut query: Query<(&mut Force, &Velocity, &Transform)>) {
+fn seek_force(
+    target_position: Vec2,
+    current_position: Vec2,
+    current_velocity: Vec2,
+    max_force: f32,
+    interest: f32,
+) -> Vec2 {
+    // target - position
+    let desired_velocity = target_position - current_position;
+
+    // steering force = desired velocity - current velocity
+    Vec2::clamp_length_max(desired_velocity - current_velocity, max_force) * interest
+}
+
+fn seek_target(
+    mut query: Query<(&mut Force, &Velocity, &Transform, &Seek)>,
+    transforms: Query<&Transform>,
+) {
+    for (mut force, velocity, Transform { translation, .. }, seek) in query.iter_mut() {
+        let force = force.as_mut();
+        if let Ok(target) = transforms.get_component::<Transform>(seek.target) {
+            force.vector = seek_force(
+                target.translation.truncate(),
+                translation.truncate(),
+                velocity.vector,
+                force.max,
+                seek.interest,
+            )
+        } else {
+            eprintln!("A Seeker's Entity doesn't exist");
+        }
+    }
+}
+
+fn seek_mouse(
+    windows: Res<Windows>,
+    mut query: Query<(&mut Force, &Velocity, &Transform, &SeekCursor)>,
+) {
     if let Some(window) = windows.as_ref().get_primary() {
         if let Some(cursor) = window.cursor_position() {
             let real_cursor_position = cursor - Vec2::new(window.width(), window.height()) / 2.0;
-            for (mut force, velocity, Transform { translation, .. }) in query.iter_mut() {
+            for (mut force, velocity, Transform { translation, .. }, seek_cursor) in
+                query.iter_mut()
+            {
                 let force = force.as_mut();
-                // target - position
-                let desired_velocity = real_cursor_position - translation.truncate();
-
-                // steering force = desired velocity - current velocity
-                force.vector =
-                    Vec2::clamp_length_max(desired_velocity - velocity.vector, force.max);
+                force.vector = seek_force(
+                    real_cursor_position,
+                    translation.truncate(),
+                    velocity.vector,
+                    force.max,
+                    seek_cursor.interest,
+                );
             }
         }
     }
