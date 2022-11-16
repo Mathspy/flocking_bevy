@@ -2,8 +2,9 @@ use bevy::{
     app::App,
     asset::Assets,
     ecs::system::{Commands, ResMut},
-    math::Vec3,
+    math::{Vec3, Vec4},
     render::{
+        color::Color,
         entity::{MeshBundle, OrthographicCameraBundle},
         mesh::{Indices, Mesh},
         pipeline::{PipelineDescriptor, PrimitiveTopology, RenderPipeline, RenderPipelines},
@@ -21,16 +22,19 @@ fn main() {
 }
 
 const CIRCLE_VERTICES: u32 = 50;
-const CIRCLE_COLOR: [f32; 3] = [1.0, 0.5, 0.313];
 
 fn create_circle_mesh() -> Mesh {
+    let color = Vec4::from(Color::rgb_u8(255, 127, 80).as_rgba_linear())
+        .truncate()
+        .to_array();
+
     let mut circle = Mesh::new(PrimitiveTopology::TriangleList);
 
-    let (positions, colors) = std::iter::once(([0.0, 0.0, 0.0], CIRCLE_COLOR))
+    let (positions, colors) = std::iter::once(([0.0, 0.0, 0.0], color))
         .chain((0..CIRCLE_VERTICES).map(|i| {
             let a = i as f32 * std::f32::consts::TAU / (CIRCLE_VERTICES as f32);
 
-            ([a.cos(), a.sin(), 0.0], CIRCLE_COLOR)
+            ([a.cos(), a.sin(), 0.0], color)
         }))
         .unzip::<_, _, Vec<[f32; 3]>, Vec<[f32; 3]>>();
     circle.set_attribute(Mesh::ATTRIBUTE_POSITION, positions);
